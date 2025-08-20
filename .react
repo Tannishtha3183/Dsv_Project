@@ -1,0 +1,427 @@
+import React, { useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, PieChart, Pie, Cell, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Treemap } from "recharts";
+import { Search, Sparkles, TrendingUp, ShieldCheck, Brain, Users, Briefcase, Download, ArrowRight, Info as InfoIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
+
+// ------------------------------------------------------------
+// Dummy dataset (replace with live data later)
+// ------------------------------------------------------------
+const sentimentOverTime = [
+  { month: "2024-01", positive: 42, neutral: 36, negative: 22 },
+  { month: "2024-04", positive: 47, neutral: 32, negative: 21 },
+  { month: "2024-07", positive: 49, neutral: 29, negative: 22 },
+  { month: "2024-10", positive: 51, neutral: 28, negative: 21 },
+  { month: "2025-01", positive: 53, neutral: 27, negative: 20 },
+  { month: "2025-04", positive: 55, neutral: 25, negative: 20 },
+];
+
+const trustByDemographic = [
+  { group: "18–24", trust: 68, concern: 38 },
+  { group: "25–34", trust: 61, concern: 42 },
+  { group: "35–44", trust: 58, concern: 46 },
+  { group: "45–54", trust: 52, concern: 53 },
+  { group: "55+", trust: 49, concern: 57 },
+];
+
+const automationRiskByIndustry = [
+  { industry: "Manufacturing", risk: 72, jobs: 1800 },
+  { industry: "Retail", risk: 66, jobs: 2100 },
+  { industry: "Transportation", risk: 70, jobs: 950 },
+  { industry: "Healthcare", risk: 39, jobs: 2300 },
+  { industry: "Education", risk: 34, jobs: 1200 },
+  { industry: "Finance", risk: 55, jobs: 800 },
+  { industry: "IT & Software", risk: 37, jobs: 1400 },
+  { industry: "Hospitality", risk: 59, jobs: 900 },
+];
+
+const skillExposure = [
+  { name: "Routine Manual", exposure: 80 },
+  { name: "Routine Cognitive", exposure: 72 },
+  { name: "Non‑routine Analytical", exposure: 35 },
+  { name: "Non‑routine Interpersonal", exposure: 28 },
+  { name: "Creative", exposure: 22 },
+];
+
+const concernsWordCloud = [
+  { name: "Job Loss", size: 60 },
+  { name: "Bias", size: 40 },
+  { name: "Privacy", size: 45 },
+  { name: "Misinformation", size: 32 },
+  { name: "Control", size: 28 },
+  { name: "Transparency", size: 24 },
+  { name: "Safety", size: 30 },
+  { name: "Copyright", size: 18 },
+];
+
+const regions = ["Global", "North America", "Europe", "Asia", "LATAM", "Africa"];
+
+// ------------------------------------------------------------
+// Helper: simple AI-like narrative based on numbers
+// ------------------------------------------------------------
+function buildInsights({ year, selectedRegion }) {
+  const latest = sentimentOverTime[sentimentOverTime.length - 1];
+  const trustYoung = trustByDemographic[0].trust;
+  const trustOld = trustByDemographic[trustByDemographic.length - 1].trust;
+  const gap = trustYoung - trustOld;
+  const topRisk = [...automationRiskByIndustry].sort((a, b) => b.risk - a.risk)[0];
+  const lowRisk = [...automationRiskByIndustry].sort((a, b) => a.risk - b.risk)[0];
+
+  return `As of ${year}, public positivity toward AI sits around ${latest.positive}% with negativity near ${latest.negative}%. Younger respondents report higher trust levels than older groups (≈${gap}‑point gap between 18–24 and 55+). ${topRisk.industry} shows the highest modeled automation exposure (~${topRisk.risk}%), while ${lowRisk.industry} remains comparatively resilient (~${lowRisk.risk}%). In ${selectedRegion}, expect the biggest short‑term impacts in routine tasks, with non‑routine analytical and interpersonal skills comparatively shielded.`;
+}
+
+// ------------------------------------------------------------
+// Mini components
+// ------------------------------------------------------------
+const Stat = ({ icon: Icon, label, value, hint }) => (
+  <Card className="rounded-2xl shadow-md">
+    <CardContent className="p-5 flex items-center gap-4">
+      <div className="p-3 rounded-2xl bg-gray-100"><Icon className="w-6 h-6" /></div>
+      <div>
+        <div className="text-xs text-gray-500">{label}</div>
+        <div className="text-2xl font-semibold">{value}</div>
+        {hint && <div className="text-xs text-gray-400 mt-1">{hint}</div>}
+      </div>
+    </CardContent>
+  </Card>
+);
+
+const SectionTitle = ({ title, subtitle }) => (
+  <div className="mb-4">
+    <h3 className="text-xl font-semibold">{title}</h3>
+    {subtitle && <p className="text-sm text-gray-500 mt-1">{subtitle}</p>}
+  </div>
+);
+
+// ------------------------------------------------------------
+// Main App
+// ------------------------------------------------------------
+export default function App() {
+  const [activeTab, setActiveTab] = useState("home");
+  const [year, setYear] = useState(2025);
+  const [selectedRegion, setSelectedRegion] = useState("Global");
+  const [search, setSearch] = useState("");
+
+  const totalAtRiskJobs = useMemo(() => {
+    // Simple synthetic forecast based on slider year
+    const base = automationRiskByIndustry.reduce((acc, d) => acc + d.jobs * (d.risk / 100), 0);
+    const growth = 1 + (year - 2025) * 0.02; // +2% per year after 2025 (for demo)
+    return Math.round(base * growth);
+  }, [year]);
+
+  const filteredIndustries = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return automationRiskByIndustry.filter((d) => d.industry.toLowerCase().includes(q));
+  }, [search]);
+
+  const insights = useMemo(() => buildInsights({ year, selectedRegion }), [year, selectedRegion]);
+
+  return (
+    <div className="min-h-screen bg-white text-gray-900">
+      {/* Header */}
+      <header className="sticky top-0 z-20 bg-white/80 backdrop-blur border-b">
+        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-black text-white grid place-items-center text-lg font-bold">AI</div>
+            <div>
+              <h1 className="text-lg font-semibold">AI Impact & Trust Dashboard</h1>
+              <p className="text-xs text-gray-500">Public perception × job automation risk</p>
+            </div>
+          </div>
+          <div className="hidden md:flex items-center gap-2">
+            <Button variant="ghost" onClick={() => setActiveTab("home")}>Home</Button>
+            <Button variant="ghost" onClick={() => setActiveTab("dashboard")}>Dashboard</Button>
+            <Button variant="ghost" onClick={() => setActiveTab("insights")}>Insights</Button>
+            <Button variant="ghost" onClick={() => setActiveTab("about")}>About</Button>
+          </div>
+          <Button className="rounded-2xl" onClick={() => setActiveTab("dashboard")}>Explore <ArrowRight className="ml-2 w-4 h-4"/></Button>
+        </div>
+      </header>
+
+      {/* Content */}
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        <AnimatePresence mode="wait">
+          {activeTab === "home" && (
+            <motion.section key="home" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid md:grid-cols-2 gap-6 items-center">
+              <div>
+                <h2 className="text-3xl md:text-4xl font-bold leading-tight">Understand how people <span className="bg-yellow-200 px-2 rounded">trust</span> AI — and which jobs are most at <span className="bg-red-100 px-2 rounded">risk</span>.</h2>
+                <p className="text-gray-600 mt-4">Interactive visuals, AI‑generated narratives, and scenario sliders help you explore the social and economic impact of AI. Plug in your data later, or start with our demo dataset now.</p>
+                <div className="flex gap-3 mt-6">
+                  <Button className="rounded-2xl" onClick={() => setActiveTab("dashboard")}>Open Dashboard</Button>
+                  <Button variant="outline" className="rounded-2xl" onClick={() => setActiveTab("insights")}>See Insights</Button>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
+                  <Stat icon={TrendingUp} label="Positivity (latest)" value={`${sentimentOverTime.at(-1).positive}%`} hint="Share positive about AI" />
+                  <Stat icon={ShieldCheck} label="Concern (55+)" value={`${trustByDemographic.at(-1).concern}%`} hint="Higher among older groups" />
+                  <Stat icon={Users} label="Trust (18–24)" value={`${trustByDemographic[0].trust}%`} hint="Younger groups more optimistic" />
+                  <Stat icon={Briefcase} label="Jobs at Risk" value={`${totalAtRiskJobs.toLocaleString()}`} hint={`Modeled for ${year}`} />
+                </div>
+              </div>
+              <div>
+                <Card className="rounded-2xl shadow-md">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Brain className="w-5 h-5"/> Quick Preview</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid gap-6">
+                      <div className="h-44">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={sentimentOverTime} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                            <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
+                            <Tooltip />
+                            <Line type="monotone" dataKey="positive" strokeWidth={2} />
+                            <Line type="monotone" dataKey="negative" strokeWidth={2} />
+                            <Line type="monotone" dataKey="neutral" strokeWidth={2} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="h-44">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={automationRiskByIndustry}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="industry" tick={{ fontSize: 12 }} interval={0} angle={-20} dy={10} />
+                            <YAxis domain={[0, 100]} tick={{ fontSize: 12 }} />
+                            <Tooltip />
+                            <Bar dataKey="risk" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </motion.section>
+          )}
+
+          {activeTab === "dashboard" && (
+            <motion.section key="dashboard" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }}>
+              <div className="grid md:grid-cols-4 gap-4 mb-6 items-center">
+                <div className="md:col-span-2">
+                  <Label className="text-sm">Region</Label>
+                  <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+                    <SelectTrigger className="rounded-2xl"><SelectValue placeholder="Select region" /></SelectTrigger>
+                    <SelectContent>
+                      {regions.map(r => <SelectItem key={r} value={r}>{r}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="md:col-span-2">
+                  <Label className="text-sm">Scenario Year: {year}</Label>
+                  <Slider value={[year]} onValueChange={([v]) => setYear(v)} min={2023} max={2030} step={1} className="mt-2" />
+                </div>
+                <div className="md:col-span-4">
+                  <Label className="text-sm">Search industries</Label>
+                  <div className="relative mt-2">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2"/>
+                    <Input className="pl-9 rounded-2xl" placeholder="e.g., Transportation" value={search} onChange={(e) => setSearch(e.target.value)} />
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid lg:grid-cols-3 gap-6">
+                <Card className="rounded-2xl shadow-md lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><TrendingUp className="w-5 h-5"/> Public Sentiment Over Time</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={sentimentOverTime} margin={{ left: 10, right: 10, top: 5, bottom: 5 }}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis domain={[0, 100]} />
+                          <Tooltip />
+                          <Line type="monotone" dataKey="positive" strokeWidth={2} />
+                          <Line type="monotone" dataKey="neutral" strokeWidth={2} />
+                          <Line type="monotone" dataKey="negative" strokeWidth={2} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl shadow-md">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Sparkles className="w-5 h-5"/> AI Insight</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-700 leading-relaxed">{insights}</p>
+                    <div className="text-xs text-gray-400 mt-3 flex items-center gap-2"><InfoIcon className="w-4 h-4"/>Narrative auto‑generated from demo data.</div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl shadow-md">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Users className="w-5 h-5"/> Trust by Demographic</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <RadarChart data={trustByDemographic} outerRadius="80%">
+                          <PolarGrid />
+                          <PolarAngleAxis dataKey="group" />
+                          <PolarRadiusAxis domain={[0, 100]} />
+                          <Tooltip />
+                          <Radar name="Trust" dataKey="trust" strokeWidth={2} fillOpacity={0.2} />
+                        </RadarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl shadow-md lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Briefcase className="w-5 h-5"/> Automation Risk by Industry</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={filteredIndustries}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="industry" interval={0} angle={-15} dy={10} />
+                          <YAxis domain={[0, 100]} />
+                          <Tooltip />
+                          <Bar dataKey="risk" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl shadow-md">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><ShieldCheck className="w-5 h-5"/> Skill Exposure</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <PieChart>
+                          <Pie data={skillExposure} dataKey="exposure" nameKey="name" outerRadius={95}>
+                            {skillExposure.map((_, i) => (<Cell key={i} />))}
+                          </Pie>
+                          <Tooltip />
+                        </PieChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="rounded-2xl shadow-md lg:col-span-3">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2"><Brain className="w-5 h-5"/> Top Concerns (Word Treemap)</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-72">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <Treemap data={concernsWordCloud.map(d => ({ name: d.name, size: d.size }))} dataKey="size" aspectRatio={4/3} stroke="white" />
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <div className="grid md:grid-cols-3 gap-4 mt-6">
+                <Stat icon={Briefcase} label={`Modeled jobs at risk in ${year}`} value={totalAtRiskJobs.toLocaleString()} hint={`${selectedRegion} • demo estimate`} />
+                <Stat icon={TrendingUp} label="Positivity trend (2024→2025)" value={`+${sentimentOverTime.at(-1).positive - sentimentOverTime.at(-2).positive} pts`} hint="Gradual increase" />
+                <Stat icon={ShieldCheck} label="Most exposed skill" value={skillExposure[0].name} hint={`${skillExposure[0].exposure}% exposure`} />
+              </div>
+            </motion.section>
+          )}
+
+          {activeTab === "insights" && (
+            <motion.section key="insights" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="grid lg:grid-cols-3 gap-6">
+              <Card className="rounded-2xl shadow-md lg:col-span-2">
+                <CardHeader>
+                  <CardTitle>Key Takeaways</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4 text-sm leading-6 text-gray-700">
+                  <ul className="list-disc pl-5">
+                    <li>Public positivity about AI has risen ~13 points since early 2024 in the demo data.</li>
+                    <li>Trust skews younger; a noticeable gap exists between 18–24 and 55+ groups.</li>
+                    <li>Routine tasks (manual & cognitive) face the highest exposure to automation.</li>
+                    <li>Manufacturing, Transportation, and Retail show elevated risk compared to Education and Healthcare.</li>
+                    <li>Top concerns cluster around job loss, privacy, bias, and misinformation.</li>
+                  </ul>
+                  <p className="text-xs text-gray-400">Replace this content with your own write‑ups, citations, and region‑specific analysis.</p>
+                </CardContent>
+              </Card>
+
+              <Card className="rounded-2xl shadow-md">
+                <CardHeader>
+                  <CardTitle>Download Demo Data</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm text-gray-600">Export the current demo dataset as CSV to kickstart your exploration. You can later wire this up to live sources (Polymer, Google Sheets, DBs).</p>
+                  <div className="mt-4 flex gap-2">
+                    <Button className="rounded-2xl" onClick={() => {
+                      const csv = [
+                        "month,positive,neutral,negative",
+                        ...sentimentOverTime.map(d => `${d.month},${d.positive},${d.neutral},${d.negative}`)
+                      ].join("\n");
+                      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url; a.download = 'sentiment_over_time_demo.csv'; a.click();
+                      URL.revokeObjectURL(url);
+                    }}><Download className="w-4 h-4 mr-2"/>Sentiment CSV</Button>
+                    <Button variant="outline" className="rounded-2xl" onClick={() => {
+                      const csv = [
+                        "industry,risk,jobs",
+                        ...automationRiskByIndustry.map(d => `${d.industry},${d.risk},${d.jobs}`)
+                      ].join("\n");
+                      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url; a.download = 'automation_risk_by_industry_demo.csv'; a.click();
+                      URL.revokeObjectURL(url);
+                    }}>Automation CSV</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.section>
+          )}
+
+          {activeTab === "about" && (
+            <motion.section key="about" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -10 }} className="max-w-3xl">
+              <SectionTitle title="About this project" subtitle="How to plug in your real data & embed the dashboard." />
+              <div className="prose prose-sm max-w-none text-gray-700">
+                <h4>1) Swap demo data for yours</h4>
+                <p>Replace the arrays at the top (<code>sentimentOverTime</code>, <code>trustByDemographic</code>, <code>automationRiskByIndustry</code>, etc.). Keep the same keys to avoid code changes, or adapt the charts.</p>
+                <h4>2) Connect Polymer (optional)</h4>
+                <p>Export or embed your Polymer V3 board into this page via an iframe or fetch from its API (if available) and map the fields into the same shapes used here.</p>
+                <h4>3) Publish</h4>
+                <p>Drop this component into a Vite/Next.js app and deploy on Vercel/Netlify. Tailwind, recharts, framer-motion, shadcn/ui, and lucide-react are used.</p>
+                <h4>4) Extend</h4>
+                <ul>
+                  <li>Add authentication to gate private dashboards.</li>
+                  <li>Write AI narratives server-side from real metrics.</li>
+                  <li>Parameterize region and year to power permalinks.</li>
+                </ul>
+              </div>
+            </motion.section>
+          )}
+        </AnimatePresence>
+      </main>
+
+      {/* Footer */}
+      <footer className="border-t mt-10">
+        <div className="max-w-7xl mx-auto px-4 py-6 text-sm text-gray-500 flex flex-col md:flex-row gap-2 md:items-center md:justify-between">
+          <div>© {new Date().getFullYear()} AI Impact & Trust</div>
+          <div className="flex items-center gap-4">
+            <a className="hover:text-gray-700" href="#" onClick={(e) => { e.preventDefault(); setActiveTab("about"); }}>Docs</a>
+            <a className="hover:text-gray-700" href="#" onClick={(e) => { e.preventDefault(); setActiveTab("insights"); }}>Insights</a>
+            <a className="hover:text-gray-700" href="#" onClick={(e) => { e.preventDefault(); setActiveTab("dashboard"); }}>Dashboard</a>
+          </div>
+        </div>
+      </footer>
+    </div>
+  );
+}
